@@ -9,12 +9,19 @@ from distutils.core import setup
 
 __CMAKE_PREFIX_PATH__ = None
 __DEBUG__ = False
+__BUILD_RAISIM_EXT__ = False  # Default to not building raisim extension
 
 if "--CMAKE_PREFIX_PATH" in sys.argv:
     index = sys.argv.index('--CMAKE_PREFIX_PATH')
     __CMAKE_PREFIX_PATH__ = sys.argv[index+1]
     sys.argv.remove("--CMAKE_PREFIX_PATH")
     sys.argv.remove(__CMAKE_PREFIX_PATH__)
+    __BUILD_RAISIM_EXT__ = True
+
+if "--Build-Raisim" in sys.argv:
+    index = sys.argv.index("--Build-Raisim")
+    sys.argv.remove("--Build-Raisim")
+    __BUILD_RAISIM_EXT__ = True
 
 if "--Debug" in sys.argv:
     index = sys.argv.index('--Debug')
@@ -65,6 +72,10 @@ class CMakeBuild(build_ext):
         subprocess.check_call(['cmake', ext.sourcedir] + cmake_args, cwd=self.build_temp, env=env)
         subprocess.check_call(['cmake', '--build', '.'] + build_args, cwd=self.build_temp)
 
+# Only include raisim extension if explicitly requested
+ext_modules = [CMakeExtension('_raisim_gym')] if __BUILD_RAISIM_EXT__ else []
+cmdclass = dict(build_ext=CMakeBuild) if __BUILD_RAISIM_EXT__ else {}
+
 setup(
     name='raisim_gym_torch',
     version='0.0.0',
@@ -72,11 +83,11 @@ setup(
     license="proprietary",
     packages=find_packages(),
     author_email='jemin.hwangbo@gmail.com',
-    description='gym for raisim using torch.',
+    description='gym for raisim using torch. Now with gymnasium support!',
     long_description='',
-    ext_modules=[CMakeExtension('_raisim_gym')],
-    install_requires=['ruamel.yaml', 'numpy', 'torch', 'tensorboard'],
-    cmdclass=dict(build_ext=CMakeBuild),
+    ext_modules=ext_modules,
+    install_requires=['ruamel.yaml', 'numpy', 'torch', 'tensorboard', 'gymnasium>=0.26.0'],
+    cmdclass=cmdclass,
     include_package_data=True,
     zip_safe=False,
 )
