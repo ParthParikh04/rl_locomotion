@@ -19,7 +19,7 @@ class RaisimGymVecEnv:
         self._observation = np.zeros([self.num_envs, self.num_obs], dtype=np.float32)
         self.obs_rms = RunningMeanStd(shape=[self.num_envs, self.num_obs])
         self._reward = np.zeros(self.num_envs, dtype=np.float32)
-        self._done = np.zeros(self.num_envs, dtype=np.bool)
+        self._done = np.zeros(self.num_envs, dtype=bool)
         self.rewards = [[] for _ in range(self.num_envs)]
         self.displacements = np.zeros([self.num_envs, 4], dtype=np.float32)
         self.reward_info = np.zeros([self.num_envs, 16], dtype=np.float32)
@@ -54,6 +54,15 @@ class RaisimGymVecEnv:
         var_file_name = dir_name + "/var" + str(iteration) + ".csv"
         loaded_mean = np.loadtxt(mean_file_name, dtype=np.float32)
         loaded_var = np.loadtxt(var_file_name, dtype=np.float32)
+        
+        # Handle shape mismatch when loaded data has different num_envs (e.g., debug mode with 1 env vs saved with 200)
+        if loaded_mean.ndim == 1:
+            loaded_mean = loaded_mean.reshape(1, -1)
+            loaded_var = loaded_var.reshape(1, -1)
+        if loaded_mean.shape[0] != self.num_envs:
+            # Tile the first environment's statistics to match current num_envs
+            loaded_mean = np.tile(loaded_mean[0:1, :], (self.num_envs, 1))
+            loaded_var = np.tile(loaded_var[0:1, :], (self.num_envs, 1))
         #if policy_type == 0: (for cvpr)
         #    #self.obs_rms.mean[:,:loaded_mean.shape[1]] = loaded_mean
         #    #self.obs_rms.var[:,:loaded_var.shape[1]] = loaded_var

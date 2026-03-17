@@ -1,6 +1,7 @@
 import torch.nn as nn
 import numpy as np
 import torch
+from torch.distributions import Normal
 
 class Expert:
     def __init__(self, policy, device='cpu', baseDim=46):

@@ -1,4 +1,4 @@
-from ruamel.yaml import YAML, dump, RoundTripDumper
+from ruamel.yaml import YAML
 from raisimGymTorch.env.bin import dagger_a1
 from raisimGymTorch.env.RaisimGymVecEnv import RaisimGymVecEnv as VecEnv
 import os
@@ -7,6 +7,7 @@ import numpy as np
 import torch
 import sys
 import pandas as pd
+from io import StringIO
 
 VIZ = False
 use_expert_gamma = False
@@ -42,7 +43,10 @@ cfg['environment']['eval'] = True
 t_steps = cfg['environment']['history_len']
 
 # create environment from the configuration file
-env = VecEnv(dagger_a1.RaisimGymEnv(home_path + "/rsc", dump(cfg['environment'], Dumper=RoundTripDumper)), cfg['environment'])
+yaml = YAML()
+cfg_stream = StringIO()
+yaml.dump(cfg['environment'], cfg_stream)
+env = VecEnv(dagger_a1.RaisimGymEnv(home_path + "/rsc", cfg_stream.getvalue()), cfg['environment'])
 
 # shortcuts
 ob_dim = env.num_obs

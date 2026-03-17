@@ -1,8 +1,9 @@
-from ruamel.yaml import YAML, dump, RoundTripDumper
+from ruamel.yaml import YAML
 from raisimGymTorch.env.bin import dagger_a1
 from raisimGymTorch.env.RaisimGymVecEnv import RaisimGymVecEnv as VecEnv
 from raisimGymTorch.helper.raisim_gym_helper import ConfigurationSaver
 import os
+import io
 import math
 import time
 import raisimGymTorch.algo.ppo.module as ppo_module
@@ -68,7 +69,10 @@ cfg['environment']['test'] = False
 cfg['environment']['eval'] = False
 
 # create environment from the configuration file
-env = VecEnv(dagger_a1.RaisimGymEnv(home_path + "/rsc", dump(cfg['environment'], Dumper=RoundTripDumper)), cfg['environment'])
+yaml = YAML()
+yaml_stream = io.StringIO()
+yaml.dump(cfg['environment'], yaml_stream)
+env = VecEnv(dagger_a1.RaisimGymEnv(home_path + "/rsc", yaml_stream.getvalue()), cfg['environment'])
 
 # shortcuts
 ob_dim = env.num_obs

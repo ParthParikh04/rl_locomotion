@@ -1,6 +1,7 @@
-from ruamel.yaml import YAML, dump, RoundTripDumper
+from ruamel.yaml import YAML
 from raisimGymTorch.env.bin import rsg_a1_task
 from raisimGymTorch.env.RaisimGymVecEnv import RaisimGymVecEnv as VecEnv
+import io
 import os
 import time
 import numpy as np
@@ -39,7 +40,11 @@ cfg['environment']['test'] = VIZ
 cfg['environment']['eval'] = True
 
 # create environment from the configuration file
-env = VecEnv(rsg_a1_task.RaisimGymEnv(home_path + "/rsc", dump(cfg['environment'], Dumper=RoundTripDumper)), cfg['environment'])
+yaml = YAML()
+cfg_stream = io.StringIO()
+yaml.dump(cfg['environment'], cfg_stream)
+env_cfg = cfg_stream.getvalue()
+env = VecEnv(rsg_a1_task.RaisimGymEnv(home_path + "/rsc", env_cfg), cfg['environment'])
 
 # shortcuts
 ob_dim = env.num_obs

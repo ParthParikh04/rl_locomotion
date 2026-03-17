@@ -15,8 +15,9 @@ class DaggerExpert(nn.Module):
         self.n_futures = n_futures
         mean_pth = loadpth + "/mean" + runid + ".csv"
         var_pth = loadpth + "/var" + runid + ".csv"
-        obs_mean = np.loadtxt(mean_pth, dtype=np.float32)
-        obs_var = np.loadtxt(var_pth, dtype=np.float32)
+        # np.loadtxt returns a 1D array for single-row csv files; keep a 2D shape.
+        obs_mean = np.atleast_2d(np.loadtxt(mean_pth, dtype=np.float32))
+        obs_var = np.atleast_2d(np.loadtxt(var_pth, dtype=np.float32))
         # cut it
         obs_mean = obs_mean[:,obs_mean.shape[1]//2:]
         obs_var = obs_var[:,obs_var.shape[1]//2:]

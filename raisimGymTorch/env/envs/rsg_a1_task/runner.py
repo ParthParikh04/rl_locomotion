@@ -1,9 +1,10 @@
 from statistics import geometric_mean
-from ruamel.yaml import YAML, dump, RoundTripDumper
+from ruamel.yaml import YAML, RoundTripDumper
 from raisimGymTorch.env.bin import rsg_a1_task
 from raisimGymTorch.env.RaisimGymVecEnv import RaisimGymVecEnv as VecEnv
 from raisimGymTorch.helper.raisim_gym_helper import ConfigurationSaver
 import os
+import io
 import math
 import time
 import raisimGymTorch.algo.ppo.module as ppo_module
@@ -59,7 +60,13 @@ geomDim = int(cfg['environment']['geomDim'])*int(cfg['environment']['use_slope_d
 n_futures = int(cfg['environment']['n_futures'])
 
 # create environment from the configuration file
-env = VecEnv(rsg_a1_task.RaisimGymEnv(home_path + "/rsc", dump(cfg['environment'], Dumper=RoundTripDumper)), cfg['environment'])
+yaml = YAML()
+yaml_stream = io.StringIO()
+yaml.dump(cfg['environment'], yaml_stream)
+env = VecEnv(
+    rsg_a1_task.RaisimGymEnv(home_path + "/rsc", yaml_stream.getvalue()),
+    cfg['environment'],
+)
 
 # shortcuts
 ob_dim = env.num_obs
@@ -138,7 +145,7 @@ loaded_graph_flat = torch.jit.load(flat_policy_load_path, map_location=torch.dev
 flat_expert = ppo_module.Steps_Expert(loaded_graph_flat, device=device_type, baseDim=42,
                                       geomDim=2, n_futures=1, num_g1=n_futures)
 # Encoders loading from blind stairs policy
-checkpoint = torch.load(os.path.join(task_path,"../../../../data/base_policy/full_22000.pt"))
+checkpoint = torch.load(os.path.join(task_path,"../../../../data/base_policy/full_22000.pt"), map_location=torch.device(device_type))
 blind_policy_state_dict = checkpoint['actor_architecture_state_dict']
 own_state = actor.architecture.state_dict()
 for name, param in blind_policy_state_dict.items():
@@ -169,7 +176,7 @@ if wandb:
 penalty_scale = np.array([cfg['environment']['lateralVelRewardCoeff'], cfg['environment']['angularVelRewardCoeff'], cfg['environment']['deltaTorqueRewardCoeff'], cfg['environment']['actionRewardCoeff'], cfg['environment']['sidewaysRewardCoeff'], cfg['environment']['jointSpeedRewardCoeff'], cfg['environment']['deltaContactRewardCoeff'], cfg['environment']['deltaReleaseRewardCoeff'], cfg['environment']['footSlipRewardCoeff'], cfg['environment']['upwardRewardCoeff'], cfg['environment']['workRewardCoeff'], cfg['environment']['yAccRewardCoeff'], 1., 1., 1.])
 
 if args.loadid is not None:
-    checkpoint = torch.load(saver.data_dir+"/full_"+str(args.loadid)+'.pt')
+    checkpoint = torch.load(saver.data_dir+"/full_"+str(args.loadid)+'.pt', map_location=torch.device(device_type))
     actor.architecture.load_state_dict(checkpoint['actor_architecture_state_dict'])
     actor.distribution.load_state_dict(checkpoint['actor_distribution_state_dict'])
     critic.architecture.load_state_dict(checkpoint['critic_architecture_state_dict'])

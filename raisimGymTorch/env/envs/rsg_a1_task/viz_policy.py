@@ -1,6 +1,7 @@
-from ruamel.yaml import YAML, dump, RoundTripDumper
+from ruamel.yaml import YAML
 from raisimGymTorch.env.bin import rsg_a1_task
 from raisimGymTorch.env.RaisimGymVecEnv import RaisimGymVecEnv as VecEnv
+import io
 import os
 import math
 import time
@@ -19,7 +20,7 @@ runid = sys.argv[2]
 cfg = YAML().load(open(sys.argv[1] + "/cfg.yaml", 'r'))
 cfg['environment']['num_envs'] = 1
 cfg['environment']['num_threads'] = 1
-cfg['environment']['render'] = True
+cfg['environment']['render'] = True  # Enable visualization
 
 cfg['environment']['test'] = True
 # Uncomment this for more controlled tests
@@ -30,7 +31,11 @@ cfg['environment']['test'] = True
 #cfg['environment']['speedTest'] = False
 
 # create environment from the configuration file
-env = VecEnv(rsg_a1_task.RaisimGymEnv(home_path + "/rsc", dump(cfg['environment'], Dumper=RoundTripDumper)), cfg['environment'])
+yaml = YAML()
+cfg_stream = io.StringIO()
+yaml.dump(cfg['environment'], cfg_stream)
+env_cfg = cfg_stream.getvalue()
+env = VecEnv(rsg_a1_task.RaisimGymEnv(home_path + "/rsc", env_cfg), cfg['environment'])
 
 # shortcuts
 ob_dim = env.num_obs
@@ -44,28 +49,41 @@ loaded_graph = torch.jit.load(policy_load_path)
 
 
 foot_contacts = []
-eplen = 0
+eplen = 100
 
 print("Visualizing and evaluating the current policy")
-for update in range(1):
-    env.reset()
-    env.turn_on_visualization()
+print("Make sure RaisimUnity OpenGL is running first!")
 
-    eplen = 0
-    # An high number, assumes curriculum is finished
-    env.set_itr_number(30000) #int(runid))
-    for step in range(50000):
-        time.sleep(0.01)
-        obs = env.observe(False)
-        with torch.no_grad():
-            action_ll = loaded_graph(torch.from_numpy(obs).cpu())
-        action = action_ll.cpu().detach().numpy()
+# Start video recording (optional - uncomment to record)
+env.start_video_recording("policy_" + runid + ".mp4")
 
-        reward_ll, dones = env.step(action)
-        reward_info = env.get_reward_info()[0]
-        eplen+=1
-        if dones[0]:
-            eplen = 0
-            # You can put plotting stuff here!
+try:
+    for update in range(1):
+        env.reset()
+        env.turn_on_visualization()
 
-    env.turn_off_visualization()
+        eplen = 0
+        # An high number, assumes curriculum is finished
+        env.set_itr_number(30000) #int(runid))
+        for step in range(5000):  # Reduced from 50000 for faster testing
+            time.sleep(0.01)
+            obs = env.observe(False)
+            with torch.no_grad():
+                action_ll = loaded_graph(torch.from_numpy(obs).cpu())
+            action = action_ll.cpu().detach().numpy()
+
+            reward_ll, dones = env.step(action)
+            reward_info = env.get_reward_info()[0]
+            eplen+=1
+            if dones[0]:
+                print(f"Episode completed with {eplen} steps")
+                eplen = 0
+                # You can put plotting stuff here!
+
+        env.turn_off_visualization()
+finally:
+    # Always save video even if interrupted
+    print("Saving video...")
+    env.stop_video_recording()
+    print(f"Video saved as policy_{runid}.mp4")
+

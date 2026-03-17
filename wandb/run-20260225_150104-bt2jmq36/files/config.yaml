@@ -1,0 +1,153 @@
+_wandb:
+    value:
+        cli_version: 0.24.2
+        e:
+            gejxs2q731x8witr3sn9aidjqhstwqbp:
+                args:
+                    - --name
+                    - random
+                    - --gpu
+                    - "1"
+                    - --exptid
+                    - "1"
+                    - --loadid
+                    - "5"
+                    - --overwrite
+                    - --debug
+                codePath: raisimGymTorch/env/envs/rsg_a1_task/runner.py
+                codePathLocal: raisimGymTorch/env/envs/rsg_a1_task/runner.py
+                cpu_count: 12
+                cpu_count_logical: 20
+                cudaVersion: "12.7"
+                disk:
+                    /:
+                        total: "501915541504"
+                        used: "233383813120"
+                email: parthparikh04@gmail.com
+                executable: /home/pparikh47/miniconda3/envs/cms/bin/python
+                git:
+                    commit: f71db8195bfb49b6d964bf53be3c5adadb0c11b1
+                    remote: https://github.com/ParthParikh04/rl_locomotion
+                gpu: NVIDIA GeForce RTX 3070
+                gpu_count: 1
+                gpu_nvidia:
+                    - architecture: Ampere
+                      cudaCores: 5888
+                      memoryTotal: "8589934592"
+                      name: NVIDIA GeForce RTX 3070
+                      uuid: GPU-a9f95fe5-11ed-706c-61b1-02b54d069723
+                host: cassiopeia
+                memory:
+                    total: "16544231424"
+                os: Linux-6.8.0-94-generic-x86_64-with-glibc2.17
+                program: raisimGymTorch/env/envs/rsg_a1_task/runner.py
+                python: CPython 3.8.20
+                root: /home/pparikh47/projects/cs7641-project/raisimGymTorch
+                startedAt: "2026-02-25T20:01:04.979176Z"
+                writerId: gejxs2q731x8witr3sn9aidjqhstwqbp
+        m: []
+        python_version: 3.8.20
+        t:
+            "1":
+                - 1
+            "2":
+                - 1
+            "3":
+                - 1
+                - 3
+                - 13
+                - 16
+            "4": 3.8.20
+            "5": 0.24.2
+            "12": 0.24.2
+            "13": linux-x86_64
+architecture:
+    value:
+        activation: tanh
+        film_init_std: "0.1"
+        freeze_encoder: false
+        layer_type: feedforward
+        policy_net:
+            - 128
+            - 128
+        small_init: false
+        speed_vec_end_idx: 46
+        speed_vec_start_idx: 42
+        value_net:
+            - 128
+            - 128
+environment:
+    value:
+        actionRewardCoeff: "-0.05"
+        alive_bonus: 18
+        ang_speed: "0.6"
+        angularVelRewardCoeff: 35
+        baseDim: 42
+        bodyLinearVel_avg_weight: "0.2"
+        contactChangeRewardCoeff: "0.0"
+        contactDistRewardCoeff: "0.0"
+        contactRewardCoeff: "0.0"
+        control_dt: "0.01"
+        cost_coeff: "1.0"
+        cost_decay_fac: "0.997"
+        cts_target_speed: false
+        deltaContactRewardCoeff: "-0.0"
+        deltaReleaseRewardCoeff: "-0.0"
+        deltaTorqueRewardCoeff: "-0.0"
+        dynNoise: "0.0"
+        encoder_dim: 1
+        eval_every_n: 2000
+        footClearenceRewardCoeff: "0.0"
+        footSlipRewardCoeff: "-0.2"
+        forwardVelRewardCoeff: 60
+        fourier: false
+        fourier_policy: true
+        fourier_scale: 50
+        fourier_trainable: true
+        fourier_value: true
+        geomDim: 2
+        includeGRF: false
+        jointSpeedRewardCoeff: "-0.0007"
+        lat_speed: "0.3"
+        lateralVelRewardCoeff: 20
+        max_speed: "0.4"
+        max_time: "6.0"
+        n_futures: 1
+        num_envs: 1
+        num_threads: 1
+        observe_base_speed: false
+        pid_coeff: "45.0"
+        privinfo: true
+        privy_fourier_dim: 2
+        randomize_friction: true
+        randomize_gains: true
+        randomize_mass: true
+        randomize_motor_strength: true
+        randomize_yaw: false
+        regular_dim: 46
+        regular_fourier_dim: 128
+        render: false
+        roughTerrain: true
+        sidewaysRewardCoeff: "-0.03"
+        simulation_dt: "0.0025"
+        slope_threshold: "0.08"
+        speedTest: false
+        target_end_speed: "3.0"
+        target_speed_curriculum: false
+        target_speed_period: 1000
+        target_start_speed: "0.0"
+        terrainFreq: 1
+        test: false
+        torqueRewardCoeff: "0.0"
+        unnormalize_speed_vec: false
+        upwardRewardCoeff: "-0.0"
+        use_priv_vel: true
+        use_slope_dots: true
+        workRewardCoeff: "-0.05"
+        yAccRewardCoeff: "-0.0"
+record_video:
+    value: "yes"
+seed:
+    value: 1
+test:
+    value: false
