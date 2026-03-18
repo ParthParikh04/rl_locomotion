@@ -1,8 +1,9 @@
-from ruamel.yaml import YAML, dump, RoundTripDumper
+from ruamel.yaml import YAML
 from raisimGymTorch.env.bin import dagger_a1
 from raisimGymTorch.env.RaisimGymVecEnv import RaisimGymVecEnv as VecEnv
 from raisimGymTorch.helper.raisim_gym_helper import ConfigurationSaver
 import os
+import io
 import math
 import time
 import raisimGymTorch.algo.ppo.module as ppo_module
@@ -19,12 +20,22 @@ except:
 parser = argparse.ArgumentParser()
 parser.add_argument("--exptid", type = int, help='experiment id to prepend to the run')
 parser.add_argument("--overwrite", action = 'store_true')
+parser.add_argument("--override", action = 'store_true')
 parser.add_argument("--debug", action = 'store_true')
 parser.add_argument("--loadpth", type = str, default = None)
 parser.add_argument("--loadid", type = str, default = None)
 parser.add_argument("--gpu", type = int, default = 0)
 parser.add_argument("--name", type = str)
 parser.add_argument("--ext_act", type = str, default='leakyRelu')
+parser.add_argument("--method", type = str, default='supervised', choices=['supervised', 'unsupervised'])
+parser.add_argument("--z_method", type = str, default='predictive',
+                    choices=['predictive', 'pca', 'kmeans', 'gmm', 'dbscan'])
+parser.add_argument("--use_priv_decoder", action='store_true')
+parser.add_argument("--priv_decoder_dim", type=int, default=23)
+parser.add_argument("--priv_decoder_weight", type=float, default=1.0)
+parser.add_argument("--policy_loss_weight", type=float, default=0.0)
+parser.add_argument("--allow_policy_grad_to_z", action='store_true')
+parser.add_argument("--train_student_mlp", action='store_true')
 args = parser.parse_args()
 
 
@@ -68,7 +79,10 @@ cfg['environment']['test'] = False
 cfg['environment']['eval'] = False
 
 # create environment from the configuration file
-env = VecEnv(dagger_a1.RaisimGymEnv(home_path + "/rsc", dump(cfg['environment'], Dumper=RoundTripDumper)), cfg['environment'])
+yaml = YAML()
+yaml_stream = io.StringIO()
+yaml.dump(cfg['environment'], yaml_stream)
+env = VecEnv(dagger_a1.RaisimGymEnv(home_path + "/rsc", yaml_stream.getvalue()), cfg['environment'])
 
 # shortcuts
 ob_dim = env.num_obs
@@ -85,7 +99,7 @@ cfg['environment']['loadid'] = args.loadid
 # save the configuration and other files
 saver = ConfigurationSaver(log_dir=home_path + "/raisimGymTorch/data/dagger_ckpt/" + '{:04d}'.format(args.exptid),
                            save_items=[task_path + "/Environment.hpp", os.path.join(args.loadpth, f"policy_{args.loadid}.pt")],
-                                       config = cfg, overwrite = args.overwrite)
+                                       config = cfg, overwrite = (args.overwrite or args.override))
 
 if wandb:
     wandb.init(project='command_loco', config=dict(cfg), name="dagger/" + args.name)
@@ -108,11 +122,15 @@ student_mlp = ppo_module.MLP(cfg['architecture']['policy_net'],
                                         output_activation_fn, 
                                         small_init_flag)
 prop_latent_encoder = ppo_module.StateHistoryEncoder(ext_activation_map, base_dims, t_steps,
-                                                     prop_latent_dim + (n_futures+1)*geom_latent_dim)
+                                                     prop_latent_dim + (n_futures+1)*geom_latent_dim,
+                                                     predict_next_state=(args.method == 'unsupervised'),
+                                                     next_state_dim=base_dims)
 
 actor = DaggerAgent(expert_policy,
                     prop_latent_encoder,
-                    student_mlp, t_steps, base_dims, device_type, n_futures=n_futures)
+                    student_mlp, t_steps, base_dims, device_type,
+                    n_futures=n_futures,
+                    train_student_mlp=args.train_student_mlp)
 
 dagger = DaggerTrainer(
               actor=actor,
@@ -120,10 +138,20 @@ dagger = DaggerTrainer(
               num_transitions_per_env=n_steps,
               obs_shape = ob_dim,
               latent_shape = prop_latent_dim + geom_latent_dim*(n_futures+1),
+              base_obs_size=base_dims,
+              history_len=t_steps,
               num_learning_epochs=1,
               num_mini_batches=4,
               device=device_type,
               learning_rate=5e-3,
+              method=args.method,
+              z_method=args.z_method,
+              use_priv_decoder=args.use_priv_decoder,
+              priv_decoder_dim=args.priv_decoder_dim,
+              priv_decoder_weight=args.priv_decoder_weight,
+              policy_loss_weight=args.policy_loss_weight,
+              detach_z_for_policy=(not args.allow_policy_grad_to_z),
+              random_state=rng_seed,
               )
 
 env.obs_rms.mean = actor.mean
@@ -137,6 +165,7 @@ env.set_itr_number(int(args.loadid))
 for update in range(1201):
     start = time.time()
     env.reset()
+    dagger.reset_rollout()
     reward_ll_sum = 0
     forwardX_sum = 0
     penalty_sum = 0
@@ -170,7 +199,12 @@ for update in range(1201):
     env.curriculum_callback()
 
     # backward step
-    prop_mse_loss, geom_mse_loss = dagger.update()
+    loss_metrics = dagger.update()
+    prop_mse_loss = loss_metrics['prop_mse']
+    geom_mse_loss = loss_metrics['geom_mse']
+    unsup_mse_loss = loss_metrics['unsup_mse']
+    decoder_mse_loss = loss_metrics['decoder_mse']
+    policy_mse_loss = loss_metrics['policy_mse']
 
     end = time.time()
     forwardX = forwardX_sum / total_steps
@@ -215,14 +249,25 @@ for update in range(1201):
         'torqueSquare': torqueSquare,
         'dones': average_dones,
         'walkedDist': walkedDist,
+        'Method': 0 if args.method == 'supervised' else 1,
         'Latent Prop MSE': prop_mse_loss,
-        'Latent Geom MSE': geom_mse_loss})
+        'Latent Geom MSE': geom_mse_loss,
+        'Unsupervised Next Obs MSE': unsup_mse_loss,
+        'Priv Decoder MSE': decoder_mse_loss,
+        'Policy MSE': policy_mse_loss})
 
     print('----------------------------------------------------')
     print('{:>6}th iteration'.format(update))
+    print('{:<40} {:>6}'.format("method: ", args.method))
+    print('{:<40} {:>6}'.format("z_method: ", args.z_method))
+    print('{:<40} {:>6}'.format("use_priv_decoder: ", str(args.use_priv_decoder)))
+    print('{:<40} {:>6}'.format("detach z for policy: ", str(not args.allow_policy_grad_to_z)))
     print('{:<40} {:>6}'.format("average ll reward: ", '{:0.10f}'.format(average_ll_performance)))
     print('{:<40} {:>6}'.format("prop mse loss: ", '{:0.10f}'.format(prop_mse_loss)))
     print('{:<40} {:>6}'.format("geom mse loss: ", '{:0.10f}'.format(geom_mse_loss)))
+    print('{:<40} {:>6}'.format("unsup next obs mse: ", '{:0.10f}'.format(unsup_mse_loss)))
+    print('{:<40} {:>6}'.format("priv decoder mse: ", '{:0.10f}'.format(decoder_mse_loss)))
+    print('{:<40} {:>6}'.format("policy mse: ", '{:0.10f}'.format(policy_mse_loss)))
     print('{:<40} {:>6}'.format("average forward reward: ", '{:0.10f}'.format(forwardXReward)))
     print('{:<40} {:>6}'.format("average penalty reward: ", ', '.join(['{:0.4f}'.format(r) for r in scaled_penalty])))
     print('{:<40} {:>6}'.format("average walked dist: ", '{:0.10f}'.format(scaled_penalty[-1])))
