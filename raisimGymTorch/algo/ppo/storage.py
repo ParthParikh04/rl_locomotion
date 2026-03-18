@@ -24,9 +24,14 @@ class ObsStorage:
     def clear(self):
         self.step = 0
 
+    def _effective_batch_size(self):
+        return self.num_envs * self.step
+
     def mini_batch_generator_shuffle(self, num_mini_batches):
-        batch_size = self.num_envs * self.num_transitions_per_env
-        mini_batch_size = batch_size // num_mini_batches
+        batch_size = self._effective_batch_size()
+        if batch_size == 0:
+            return
+        mini_batch_size = max(1, batch_size // num_mini_batches)
 
         for indices in BatchSampler(SubsetRandomSampler(range(batch_size)), mini_batch_size, drop_last=True):
             obs_batch = self.obs.view(-1, *self.obs.size()[2:])[indices]
@@ -34,12 +39,15 @@ class ObsStorage:
             yield obs_batch, expert_action_batch
 
     def mini_batch_generator_inorder(self, num_mini_batches):
-        batch_size = self.num_envs * self.num_transitions_per_env
-        mini_batch_size = batch_size // num_mini_batches
+        batch_size = self._effective_batch_size()
+        if batch_size == 0:
+            return
+        mini_batch_size = max(1, batch_size // num_mini_batches)
 
-        for batch_id in range(num_mini_batches):
-            yield self.obs.view(-1, *self.obs.size()[2:])[batch_id*mini_batch_size:(batch_id+1)*mini_batch_size], \
-                self.expert.view(-1, *self.expert.size()[2:])[batch_id*mini_batch_size:(batch_id+1)*mini_batch_size]
+        for start in range(0, batch_size, mini_batch_size):
+            end = min(start + mini_batch_size, batch_size)
+            yield self.obs.view(-1, *self.obs.size()[2:])[start:end], \
+                self.expert.view(-1, *self.expert.size()[2:])[start:end]
 
 class RolloutStorage:
     def __init__(self, num_envs, num_transitions_per_env, actor_obs_shape, critic_obs_shape, actions_shape, device):

@@ -1,4 +1,4 @@
-from ruamel.yaml import dump, RoundTripDumper
+from ruamel.yaml import YAML
 from shutil import copyfile
 import datetime
 import os
@@ -22,7 +22,7 @@ class ConfigurationSaver:
 
         if config is not None:
             with open(self._data_dir + '/cfg.yaml', 'w') as fptr:
-                dump(config, stream = fptr, Dumper = RoundTripDumper)
+                YAML().dump(config, fptr)
 
         if save_items is not None:
             for save_item in save_items:

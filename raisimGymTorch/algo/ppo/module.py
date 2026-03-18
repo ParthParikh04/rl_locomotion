@@ -271,10 +271,13 @@ class MLPEncode_wrap(nn.Module):
         self.output_shape = self.architecture.output_shape
 
 class StateHistoryEncoder(nn.Module):
-    def __init__(self, activation_fn, input_size, tsteps, output_size):
+    def __init__(self, activation_fn, input_size, tsteps, output_size,
+                 predict_next_state=False, next_state_dim=None):
         super(StateHistoryEncoder, self).__init__()
         self.activation_fn = activation_fn
         self.tsteps = tsteps
+        self.predict_next_state = predict_next_state
+        self.next_state_dim = input_size if next_state_dim is None else next_state_dim
         self.input_shape = input_size*tsteps
         self.output_shape = output_size
         # self.encoder = nn.Sequential(
@@ -318,6 +321,14 @@ class StateHistoryEncoder(nn.Module):
         else:
             raise NotImplementedError()
 
+        if self.predict_next_state:
+            self.next_state_predictor = nn.Sequential(
+                nn.Linear(output_size, 64), self.activation_fn(),
+                nn.Linear(64, self.next_state_dim)
+            )
+        else:
+            self.next_state_predictor = None
+
 
 
     def forward(self, obs):
@@ -327,6 +338,13 @@ class StateHistoryEncoder(nn.Module):
         output = self.conv_layers(projection.reshape([bs, -1, T]))
         output = self.linear_output(output)
         return output
+
+    def predict_next(self, obs):
+        if self.next_state_predictor is None:
+            raise RuntimeError("next-state prediction head is disabled for this encoder")
+        latent = self.forward(obs)
+        next_state = self.next_state_predictor(latent)
+        return latent, next_state
 
 class MLP(nn.Module):
     def __init__(self, shape, actionvation_fn, input_size, output_size, output_activation_fn = None, small_init= False, base_obdim = None):
